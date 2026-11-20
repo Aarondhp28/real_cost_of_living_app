@@ -1,0 +1,18 @@
+{
+  "CCT_inbound_PerCapita": 0,
+  "CCT_outbound_PerCapita": 0,
+  "CCT_within_PerCapita": 1,
+  "ACS_median_home_value": -1,
+  "ZVHI_Median_Annual_Home_Value": -1,
+  "ACS_housing_units_PerCapita": 0,
+  "ACS_occupied_units_PerCapita": 0,
+  "ACS_vacant_units_PerCapita": 0,
+  "ACS_owner_occupied_units_PerCapita": 0,
+  "AHRF_phys_nf_prim_care_pc_exc_rsdt_PerCapita": 1,
+  "AHRF_md_nf_pc_hosp_all_PerCapita": 1,
+  "AHRF_md_nf_all_med_spec_pc_hosp_ft_PerCapita": 1,
+  "AHRF_md_nf_all_surg_spc_pc_hosp_ft_PerCapita": 1,
+  "BUSGROW_establishments_PerCapita": 1,
+  "BUSGROW_employment_PerCapita": 1,
+  "EFD_Panel.Spend_Per_Student": 1
+}

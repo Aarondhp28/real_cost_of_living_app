@@ -1,0 +1,74 @@
+# =============================================================
+# build_preview_data.py
+# ONE-TIME SETUP SCRIPT. Run it once (and again only if the raw
+# climate files change). It combines the 4 NOAA climate files into
+# one small file, county_extras.csv, that the app loads.
+# =============================================================
+
+import pandas as pd
+
+# The 4 NOAA files in the raw folder, and the column name each becomes.
+CLIMATE_FILES = {
+    "raw/climate_avg_temp.csv": "avg_temp_2025",    # degrees F, all of 2025
+    "raw/climate_precip.csv": "precip_2025",        # inches, all of 2025
+    "raw/climate_july_high.csv": "july_high_2025",  # degrees F, July 2025
+    "raw/climate_jan_low.csv": "jan_low_2025",      # degrees F, January 2025
+}
+
+# --- Step 1: a lookup from state abbreviation to state FIPS code -----
+# NOAA labels counties like "AL-001" (state letters + county number).
+# Our files use "01001" (state number + county number).
+# The first 2 digits of our FIPS codes are the state number, so the
+# name file tells us that "AL" = "01", "AK" = "02", and so on.
+try:
+    names = pd.read_csv("county_names.csv", dtype=str, sep=None,
+                        engine="python", encoding="utf-8-sig")
+except UnicodeDecodeError:
+    names = pd.read_csv("county_names.csv", dtype=str, sep=None,
+                        engine="python", encoding="cp1252")
+state_code = (names.assign(st=names["fips"].str[:2])
+                   .drop_duplicates("state_abbr")
+                   .set_index("state_abbr")["st"])
+
+
+def read_noaa(path, new_name):
+    """Read one NOAA file and return a column of values indexed by FIPS."""
+    # comment="#" skips NOAA's description lines at the top of the file.
+    # encoding="latin-1" can read any file without crashing on letters
+    # like the ñ in "Doña Ana County" (we only use the ID and Value columns).
+    df = pd.read_csv(path, comment="#", dtype={"ID": str}, encoding="latin-1")
+
+    # Print the file's title line so you can confirm it's the right file.
+    with open(path, encoding="latin-1") as f:
+        print(f"{path}:  {f.readline().strip()}")
+
+    # Split "AL-001" into "AL" and "001", then build "01001".
+    parts = df["ID"].str.split("-", expand=True)
+    df["fips"] = parts[0].map(state_code) + parts[1].str.zfill(3)
+
+    # Drop any rows whose state isn't in our name file (they can't match).
+    df = df.dropna(subset=["fips"])
+
+    return df.set_index("fips")["Value"].rename(new_name)
+
+
+# --- Step 2: read all 4 files and line them up side by side ----------
+extras = pd.concat([read_noaa(p, n) for p, n in CLIMATE_FILES.items()],
+                   axis=1)
+extras.index.name = "fips"
+
+# --- Step 3: check how many of OUR counties got climate data ---------
+ours = pd.read_csv("cs_scaled_2023.csv")["county"].astype(str).str.zfill(5)
+matched = ours.isin(extras.index)
+print(f"\nCounties in our data: {len(ours):,}")
+print(f"Counties with climate data: {matched.sum():,}")
+missing = ours[~matched]
+if len(missing):
+    # Show which states the unmatched counties are in.
+    print("Missing, by state code:",
+          missing.str[:2].value_counts().to_dict())
+
+# --- Step 4: save only our counties --------------------------------
+extras = extras[extras.index.isin(ours)]
+extras.round(1).to_csv("county_extras.csv")
+print(f"\nSaved county_extras.csv with {len(extras):,} rows.")
