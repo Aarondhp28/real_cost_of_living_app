@@ -162,7 +162,27 @@ overall = quality_score(z, cat_map, direction, cat_weights)
 match_score = (overall - overall.min()) / (overall.max() - overall.min()) * 100
 
 # The FIPS codes of the top counties, best first.
-top = overall.nlargest(top_n).index
+# --- Population floor: hide counties below a minimum size ------
+@st.cache_data
+def load_population():
+    """2023 population for each county, from county_extras.csv."""
+    pop = pd.read_csv("county_extras.csv", dtype={"fips": str})
+    return pop.set_index("fips")["population_2023"]
+
+
+population = load_population()
+
+# A slider with fixed stops, shown in the sidebar.
+min_pop = st.sidebar.select_slider(
+    "Minimum county population",
+    options=[0, 10_000, 25_000, 50_000, 100_000, 250_000],
+    value=0,
+    format_func=lambda n: "No minimum" if n == 0 else f"{n:,}",
+)
+
+# Keep only counties at or above the minimum, then take the best ones.
+eligible = overall[population.reindex(overall.index) >= min_pop]
+top = eligible.nlargest(top_n).index
 
 # Build the results table one column at a time.
 results = pd.DataFrame({
@@ -279,7 +299,7 @@ with card:
 
     # Only 3,015 of 3,021 counties have NOAA climate data,
     # so check that this county is in the file before showing numbers.
-    if fips in extras.index:
+    if pd.notna(extras.loc[fips, "avg_temp_2025"]):   # skip counties with blank climate data
         cl = extras.loc[fips]               # this county's climate row
         k1, k2, k3, k4 = st.columns(4)      # four numbers side by side
         k1.metric("Average temperature", f"{cl['avg_temp_2025']:.1f} °F")

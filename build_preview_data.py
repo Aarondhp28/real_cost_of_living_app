@@ -68,7 +68,20 @@ if len(missing):
     print("Missing, by state code:",
           missing.str[:2].value_counts().to_dict())
 
-# --- Step 4: save only our counties --------------------------------
-extras = extras[extras.index.isin(ours)]
+# --- Step 4: add 2023 population from the master panel ------------
+# The master panel has one row per county per year (2022 and 2023).
+# Keep only 2023, rebuild the 5-digit FIPS code, and take POPESTIMATE.
+panel = pd.read_csv("Master_Panel_PerCapita.csv")
+panel = panel[panel["Year"] == 2023]
+panel["fips"] = panel["county"].astype(str).str.zfill(5)
+population = panel.set_index("fips")["POPESTIMATE"]
+print(f"Counties with 2023 population: {ours.isin(population.index).sum():,}")
+
+# --- Step 5: one row for EVERY county in our data, then save ---------
+# reindex keeps all 3,021 counties. Counties NOAA doesn't cover get a
+# blank (NaN) in the climate columns, but still get their population.
+extras = extras.reindex(ours)
+extras.index.name = "fips"
+extras["population_2023"] = population.reindex(ours).values
 extras.round(1).to_csv("county_extras.csv")
 print(f"\nSaved county_extras.csv with {len(extras):,} rows.")
