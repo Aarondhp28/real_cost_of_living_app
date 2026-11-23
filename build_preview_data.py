@@ -5,6 +5,7 @@
 # one small file, county_extras.csv, that the app loads.
 # =============================================================
 
+import glob                  # finds files by pattern
 import pandas as pd
 
 # The 4 NOAA files in the raw folder, and the column name each becomes.
@@ -77,11 +78,26 @@ panel["fips"] = panel["county"].astype(str).str.zfill(5)
 population = panel.set_index("fips")["POPESTIMATE"]
 print(f"Counties with 2023 population: {ours.isin(population.index).sum():,}")
 
+# --- Step 4b: add map coordinates from the Census Gazetteer file -----
+# Finds the Gazetteer counties file in the raw folder, whatever its
+# exact name is (for example 2024_Gaz_counties_national.txt).
+gaz_path = glob.glob("raw/*Gaz_counties*.txt")[0]
+# sep="|" because the Census separates columns with | instead of commas.
+gaz = pd.read_csv(gaz_path, sep="|", dtype={"GEOID": str}, encoding="latin-1")
+gaz.columns = gaz.columns.str.strip()   # remove stray spaces in column names
+coords = gaz.set_index("GEOID")[["INTPTLAT", "INTPTLONG"]]
+print(f"Counties with map coordinates: {ours.isin(coords.index).sum():,}")
+
 # --- Step 5: one row for EVERY county in our data, then save ---------
 # reindex keeps all 3,021 counties. Counties NOAA doesn't cover get a
 # blank (NaN) in the climate columns, but still get their population.
 extras = extras.reindex(ours)
 extras.index.name = "fips"
 extras["population_2023"] = population.reindex(ours).values
-extras.round(1).to_csv("county_extras.csv")
+extras["lat"] = coords["INTPTLAT"].reindex(ours).values    # latitude
+extras["lon"] = coords["INTPTLONG"].reindex(ours).values   # longitude
+# Round climate to 1 decimal; keep full precision for coordinates.
+extras = extras.round({"avg_temp_2025": 1, "precip_2025": 1,
+                       "july_high_2025": 1, "jan_low_2025": 1})
+extras.to_csv("county_extras.csv")
 print(f"\nSaved county_extras.csv with {len(extras):,} rows.")

@@ -353,7 +353,33 @@ with card:
         st.caption("Typical county = the middle (median) value of all 3,021 counties.")
 
 # =============================================================
-# BLOCK 5: "How this works" - a plain-English explanation
+# BLOCK 5: Map of the top counties
+# =============================================================
+
+@st.cache_data
+def load_coords():
+    """Latitude and longitude for each county, from county_extras.csv."""
+    c = pd.read_csv("county_extras.csv", dtype={"fips": str})
+    return c.set_index("fips")[["lat", "lon"]]
+
+
+coords = load_coords()
+
+# One row per county in the current top list.
+map_data = coords.loc[top].copy()
+map_data["color"] = "#1f77b4"   # blue dots for every top county
+map_data["size"] = 15000        # dot radius, in meters
+
+# Make the county in the preview card stand out: bigger and red.
+map_data.loc[fips, "color"] = "#d62728"
+map_data.loc[fips, "size"] = 40000
+
+st.subheader("Where your top counties are")
+st.caption("Red = the county in the preview card. Blue = your other top results.")
+st.map(map_data, latitude="lat", longitude="lon", color="color", size="size")
+
+# =============================================================
+# BLOCK 6: "How this works" - a plain-English explanation
 # =============================================================
 
 st.divider()   # a thin line separating the app from the explanation
